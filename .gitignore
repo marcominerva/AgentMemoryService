@@ -417,5 +417,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-/AgentBasicService/appsettings.local.json
 /AgentMemoryService/appsettings.local.json
