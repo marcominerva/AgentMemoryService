@@ -2,7 +2,6 @@ using System.ClientModel;
 using System.Collections.Concurrent;
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
-using System.Security.Claims;
 using System.Text.Json;
 using AgentBasicService.Settings;
 using Microsoft.Agents.AI;
@@ -95,8 +94,7 @@ app.MapSwaggerUI(setupAction: options =>
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapPost("/api/chat", async (ChatRequest request, [FromKeyedServices("Default")] AIAgent agent, [FromKeyedServices("Default")] AgentSessionStore store,
-    ClaimsPrincipal user) =>
+app.MapPost("/api/chat", async (ChatRequest request, [FromKeyedServices("Default")] AIAgent agent, [FromKeyedServices("Default")] AgentSessionStore store) =>
 {
     var conversationId = request.ConversationId ?? Guid.NewGuid().ToString("N");
     var session = await store.GetSessionAsync(agent, conversationId);
