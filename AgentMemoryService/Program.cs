@@ -2,6 +2,7 @@ using System.ClientModel;
 using System.Collections.Concurrent;
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
+using System.Security.Claims;
 using System.Text.Json;
 using AgentBasicService.Settings;
 using Microsoft.Agents.AI;
@@ -10,13 +11,17 @@ using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Responses;
+using SimpleAuthentication;
 using TinyHelpers.AspNetCore.Extensions;
+using TinyHelpers.AspNetCore.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
 // Add services to the container.
 builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddSimpleAuthentication(builder.Configuration);
 
 var openAISettings = builder.Services.ConfigureAndGet<AzureOpenAISettings>(builder.Configuration, "AzureOpenAI")!;
 builder.Services.AddChatClient(_ =>
@@ -62,12 +67,24 @@ builder.Services.AddAIAgent("Default", (services, key) =>
     return agentSessionStore;
 }, withIsolation: false);
 
-builder.Services.AddOpenApi();
+builder.Services.AddDefaultProblemDetails();
+builder.Services.AddDefaultExceptionHandler();
+
+builder.Services.AddOpenApi(options =>
+{
+    options.RemoveServerList();
+    options.AddDefaultProblemDetailsResponse();
+
+    options.AddSimpleAuthentication(builder.Configuration);
+});
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 app.UseHttpsRedirection();
+
+app.UseStatusCodePages();
+app.UseExceptionHandler();
 
 app.MapOpenApi();
 app.MapSwaggerUI(setupAction: options =>
@@ -75,7 +92,11 @@ app.MapSwaggerUI(setupAction: options =>
     options.SwaggerEndpoint("/openapi/v1.json", app.Environment.ApplicationName);
 });
 
-app.MapPost("/api/chat", async (ChatRequest request, [FromKeyedServices("Default")] AIAgent agent, [FromKeyedServices("Default")] AgentSessionStore store) =>
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapPost("/api/chat", async (ChatRequest request, [FromKeyedServices("Default")] AIAgent agent, [FromKeyedServices("Default")] AgentSessionStore store,
+    ClaimsPrincipal user) =>
 {
     var conversationId = request.ConversationId ?? Guid.NewGuid().ToString("N");
     var session = await store.GetSessionAsync(agent, conversationId);
@@ -85,7 +106,8 @@ app.MapPost("/api/chat", async (ChatRequest request, [FromKeyedServices("Default
     await store.SaveSessionAsync(agent, conversationId, session);
 
     return TypedResults.Ok(new ChatResponse(conversationId, response.Text));
-});
+})
+.RequireAuthorization();
 
 app.MapPost("/api/chat/streaming", async (ChatRequest request, [FromKeyedServices("Default")] AIAgent agent, [FromKeyedServices("Default")] AgentSessionStore store, CancellationToken cancellationToken) =>
 {
@@ -114,7 +136,8 @@ app.MapPost("/api/chat/streaming", async (ChatRequest request, [FromKeyedService
     }
 
     return TypedResults.ServerSentEvents(StreamAsync(cancellationToken));
-});
+})
+.RequireAuthorization();
 
 app.Run();
 
