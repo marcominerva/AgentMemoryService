@@ -105,7 +105,7 @@ app.MapPost("/api/chat", async (ChatRequest request, [FromKeyedServices("Default
 
     await store.SaveSessionAsync(agent, conversationId, session);
 
-    return TypedResults.Ok(new ChatResponse(conversationId, response.Text));
+    return TypedResults.Ok(new ChatResponse(conversationId, response.Text, response.Usage?.TotalTokenCount));
 })
 .RequireAuthorization();
 
