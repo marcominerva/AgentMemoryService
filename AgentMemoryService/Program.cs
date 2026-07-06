@@ -262,12 +262,7 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
 
         if (memory is null)
         {
-            memory = new UserMemory
-            {
-                UserName = userName!,
-                Facts = []
-            };
-
+            memory = new UserMemory { UserName = userName! };
             dbContext.Memories.Add(memory);
         }
 
@@ -283,8 +278,8 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
         });
 
         var response = await memoryExtractorAgent.RunAsync<MemoryUpdate>(context.RequestMessages.Last(), options: options, cancellationToken: cancellationToken);
-
         var memoryUpdate = response.Result;
+
         if (!memoryUpdate.MemoriesToAdd.Any() && !memoryUpdate.MemoriesToRemove.Any())
         {
             // There is nothing to update, so we can return early.
