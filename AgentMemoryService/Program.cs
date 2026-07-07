@@ -109,10 +109,10 @@ builder.Services.AddAIAgent("Memory", (services, key) =>
                 When removing memories, return the exact known fact text from the provided list.
 
                 Examples:
-                - Known: "The user lives in London." Latest: "I now live in Paris." Add the Paris memory and remove the London memory.
-                - Known: "The user is from Turin." Latest: "I moved to Milan." Add the Milan memory and do not remove Turin, because origin and current residence can both be true.
-                - Known: "The user likes tea." Latest: "I do not like tea anymore." Add the new preference if useful and remove the old tea preference.
-                - Known: "The user likes tea." Latest: "I also like coffee." Add coffee and do not remove tea.
+                - Known: "The user lives in London." Message: "I now live in Paris." Add the Paris memory and remove the London memory.
+                - Known: "The user is from Turin." Message: "I moved to Milan." Add the Milan memory and do not remove Turin, because origin and current residence can both be true.
+                - Known: "The user likes tea." Message: "I do not like tea anymore." Add the new preference if useful and remove the old tea preference.
+                - Known: "The user likes tea." Message: "I also like coffee." Add coffee and do not remove tea.
                 - Known: "The user works as a developer." Message: "I am now an engineering manager." Add the manager role and remove the developer role only if the user message clearly indicates the role changed.
 
                 If there are no new facts and no clearly invalidated facts, return empty collections.
