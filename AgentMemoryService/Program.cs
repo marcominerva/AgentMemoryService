@@ -89,20 +89,20 @@ builder.Services.AddAIAgent("Memory", (services, key) =>
         ChatOptions = new()
         {
             Instructions = """
-                Look at the user's latest message and update the user's memories.
+                Look at the user message and update the user's memories.
 
-                The input includes an indexed list of known facts about the user.
-                Extract only stable user facts from the latest user message, such as names, places, likes, dislikes, current state, preferences, relationships, roles, or anything the user asks to remember.
+                The known facts about the user are provided in the system instructions.
+                Extract only stable user facts from the user message, such as names, places, likes, dislikes, current state, preferences, relationships, roles, or anything the user asks to remember.
 
-                Add a new memory only when the latest message contains a stable fact that is not already present.
+                Add a new memory only when the user message contains a stable fact that is not already present.
 
                 Remove an existing memory only when all of these are true:
-                - the latest message provides a newer fact about the same subject;
+                - the user message provides a newer fact about the same subject;
                 - the newer fact refers to the same underlying attribute, property, preference, state, relationship, or commitment;
                 - the existing fact and the newer fact cannot both be true at the same time;
-                - the latest message clearly replaces, negates, corrects, or invalidates the existing fact.
+                - the user message clearly replaces, negates, corrects, or invalidates the existing fact.
 
-                Do not remove an existing memory when the latest message merely adds related information.
+                Do not remove an existing memory when the user message merely adds related information.
                 Do not remove an existing memory when both facts can reasonably be true together.
                 Do not remove an existing memory when the relationship between the two facts is ambiguous.
                 Prefer keeping memories over removing them when unsure.
@@ -113,7 +113,7 @@ builder.Services.AddAIAgent("Memory", (services, key) =>
                 - Known: "The user is from Turin." Latest: "I moved to Milan." Add the Milan memory and do not remove Turin, because origin and current residence can both be true.
                 - Known: "The user likes tea." Latest: "I do not like tea anymore." Add the new preference if useful and remove the old tea preference.
                 - Known: "The user likes tea." Latest: "I also like coffee." Add coffee and do not remove tea.
-                - Known: "The user works as a developer." Latest: "I am now an engineering manager." Add the manager role and remove the developer role only if the latest message clearly indicates the role changed.
+                - Known: "The user works as a developer." Message: "I am now an engineering manager." Add the manager role and remove the developer role only if the user message clearly indicates the role changed.
 
                 If there are no new facts and no clearly invalidated facts, return empty collections.
                 """
