@@ -11,6 +11,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     {
         modelBuilder.Entity<UserMemory>(entity =>
         {
+            entity.ToTable("Memories");
             entity.HasIndex(e => e.UserName, "IX_Memories_UserName").IsUnique();
 
             entity.Property(e => e.Id).HasDefaultValueSql("(newsequentialid())", "DF_Memories_Id");
