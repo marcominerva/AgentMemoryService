@@ -245,7 +245,7 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
             return aiContext;
         }
 
-        var knownFacts = string.Join(Environment.NewLine, memory.Facts.Select(fact => $"- {fact}"));
+        var knownFacts = string.Join("\n", memory.Facts.Select(fact => $"- {fact}"));
         var instructions = $"""
             ## User Memories
             {knownFacts}
@@ -266,7 +266,7 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
             dbContext.Memories.Add(memory);
         }
 
-        var knownFacts = string.Join(Environment.NewLine, memory.Facts.Select(fact => $"- {fact}"));
+        var knownFacts = string.Join("\n", memory.Facts.Select(fact => $"- {fact}"));
         var options = new ChatClientAgentRunOptions(new()
         {
             Instructions = $"""
@@ -280,16 +280,16 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
         var response = await memoryExtractorAgent.RunAsync<MemoryUpdate>(context.RequestMessages.Last(), options: options, cancellationToken: cancellationToken);
         var memoryUpdate = response.Result;
 
-        if (!memoryUpdate.MemoriesToAdd.Any() && !memoryUpdate.MemoriesToRemove.Any())
+        if (!memoryUpdate.FactsToAdd.Any() && !memoryUpdate.FactsToRemove.Any())
         {
             // There is nothing to update, so we can return early.
             return;
         }
 
-        foreach (var memoryToRemove in memoryUpdate.MemoriesToRemove)
+        foreach (var factToRemove in memoryUpdate.FactsToRemove)
         {
-            var existingMemory = memory.Facts.FirstOrDefault(fact =>
-                string.Equals(fact, memoryToRemove, StringComparison.OrdinalIgnoreCase));
+            var factToRemoveTrimmed = factToRemove.TrimEnd('.');
+            var existingMemory = memory.Facts.FirstOrDefault(fact => string.Equals(fact, factToRemoveTrimmed, StringComparison.OrdinalIgnoreCase));
 
             if (existingMemory is not null)
             {
@@ -297,11 +297,13 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
             }
         }
 
-        foreach (var memoryToAdd in memoryUpdate.MemoriesToAdd)
+        foreach (var factToAdd in memoryUpdate.FactsToAdd)
         {
-            if (!memory.Facts.Contains(memoryToAdd, StringComparer.OrdinalIgnoreCase))
+            var factToAddTrimmed = factToAdd.TrimEnd('.');
+
+            if (!memory.Facts.Contains(factToAddTrimmed, StringComparer.OrdinalIgnoreCase))
             {
-                memory.Facts.Add(memoryToAdd);
+                memory.Facts.Add(factToAddTrimmed);
             }
         }
 
@@ -309,6 +311,6 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
     }
 }
 
-public record MemoryUpdate(
-    [property: Description("New stable user facts to add. Do not include facts already present in the known facts list.")] IEnumerable<string> MemoriesToAdd,
-    [property: Description("Exact known fact texts to remove. Include a known fact only when it is clearly contradicted, replaced, negated, corrected, or invalidated by the latest user message.")] IEnumerable<string> MemoriesToRemove);
+public record class MemoryUpdate(
+    [property: Description("New stable user facts to add. Do not include facts already present in the known facts list.")] IEnumerable<string> FactsToAdd,
+    [property: Description("Exact known fact texts to remove. Include a known fact only when it is clearly contradicted, replaced, negated, corrected, or invalidated by the latest user message.")] IEnumerable<string> FactsToRemove);
