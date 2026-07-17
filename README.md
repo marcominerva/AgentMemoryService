@@ -1,14 +1,14 @@
 # Agent Memory Service
 
-Sample Web API that demonstrates how to build an agent with user memory using Microsoft Agent Framework, Azure OpenAI, API key authentication, and SQL Server.
+Sample Web API that demonstrates how to build an agent with user memory using Microsoft Agent Framework, Azure OpenAI, API key authentication, Entity Framework Core, and SQL Server.
 
-The service exposes chat endpoints that use a default conversational agent. After every interaction, a second agent analyzes the latest user message and updates the user's persistent memories in SQL Server.
+The service exposes chat endpoints that use a default conversational agent. After every interaction, a second agent analyzes the latest user message and updates the user's persistent memories in SQL Server. Conversation sessions are also persisted in SQL Server, so clients can continue a conversation by reusing the returned conversation ID.
 
 ## How it works
 
 The project defines two AI agents:
 
-- **Default agent**: answers user messages and receives the user's known memories as additional context.
+- **Default agent**: answers user messages, receives the user's known memories as additional context, and can use a date/time tool when needed.
 - **Memory agent**: extracts stable facts from the latest user message and decides which memories should be added or removed.
 
 The request flow is:
@@ -18,9 +18,9 @@ The request flow is:
 3. The `UserMemoryContextProvider` loads the user's memories from SQL Server.
 4. The default agent receives those memories as context and generates the response.
 5. The memory agent reviews the latest user message and updates the `Memories` table when it finds new or invalidated stable facts.
-6. The conversation session is stored in memory by conversation ID.
+6. The conversation session is stored in the `Conversations` table by user and conversation ID.
 
-Conversation history is kept in memory, while user memories are persisted in SQL Server.
+Both conversation sessions and user memories are persisted in SQL Server.
 
 ## Endpoints
 
@@ -37,7 +37,7 @@ Returns a complete chat response.
 }
 ```
 
-If `conversationId` is omitted or `null`, the service creates a new conversation ID and returns it in the response. Send the same ID in following requests to continue the same in-memory session.
+If `conversationId` is omitted or `null`, the service creates a new conversation ID and returns it in the response. Send the same ID in following requests to continue the same persisted session.
 
 ### `POST /api/chat/streaming`
 
@@ -49,7 +49,7 @@ Returns the response as Server-Sent Events:
 
 ## Configuration
 
-Configure the application in `AgentMemoryService/appsettings.json`.
+Configure the application in `AgentMemoryService/appsettings.json`. You can also create `AgentMemoryService/appsettings.local.json` for local overrides; it is loaded automatically when present.
 
 ### Connection string
 
@@ -108,25 +108,14 @@ Use different API keys and user names to keep memories separated by user.
 
 ## Database setup
 
-The service uses SQL Server and stores user memories in the `Memories` table. Run the following script before starting the application:
+The service uses Entity Framework Core migrations. On startup, the application creates the database when it does not exist and applies any pending migrations automatically.
 
-```sql
-CREATE TABLE [dbo].[Memories]
-(
-    [Id] uniqueidentifier NOT NULL
-        CONSTRAINT [DF_Memories_Id] DEFAULT (newsequentialid()),
-    [UserName] nvarchar(64) NOT NULL,
-    [Facts] json NOT NULL,
-    CONSTRAINT [PK_Memories] PRIMARY KEY ([Id])
-);
-GO
+The current model stores:
 
-CREATE UNIQUE INDEX [IX_Memories_UserName]
-    ON [dbo].[Memories] ([UserName]);
-GO
-```
+- user memories in the `Memories` table, with `Facts` stored as a JSON array;
+- conversation sessions in the `Conversations` table, keyed by user name and conversation ID.
 
-The `Facts` column contains the user's memories as a JSON array managed by Entity Framework Core.
+No manual SQL script is required before starting the application. The configured SQL Server login must have permission to create the database when needed and apply schema migrations.
 
 ## Run the service
 
@@ -141,3 +130,5 @@ The development profile exposes the application at:
 - `https://localhost:7017`
 
 Swagger UI is available at `/swagger` when using the HTTPS launch profile.
+
+The OpenAPI document is available at `/openapi/v1.json`.
