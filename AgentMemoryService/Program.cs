@@ -1,12 +1,12 @@
 using System.ClientModel;
-using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
+using System.Security.Claims;
 using AgentBasicService.Settings;
 using AgentMemoryService.Data;
 using AgentMemoryService.Data.Entities;
+using AgentMemoryService.SessionStores;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Workflows;
@@ -42,8 +42,26 @@ builder.Services.AddKeyedChatClient("Memory", _ =>
     return openAIClient.GetResponsesClient().AsIChatClientWithStoredOutputDisabled(openAISettings.MemoryDeployment);
 });
 
-builder.Services.AddSingleton<InMemorySessionStore>();
+builder.Services.UseClaimsBasedSessionIsolation(new()
+{
+    ClaimType = ClaimTypes.Name
+});
+
 builder.Services.AddScoped<UserMemoryContextProvider>();
+
+//builder.Services.AddSingleton<InMemorySessionStore>();
+
+//builder.Services.AddHybridCache(options =>
+//{
+//    options.DefaultEntryOptions = new()
+//    {
+//        LocalCacheExpiration = TimeSpan.FromHours(4)
+//    };
+//});
+
+//builder.Services.AddSingleton<HybridCacheSessionStore>();
+
+builder.Services.AddScoped<DatabaseSessionStore>();
 
 builder.Services.AddAIAgent("Default", (services, key) =>
 {
@@ -61,6 +79,7 @@ builder.Services.AddAIAgent("Default", (services, key) =>
 
     return chatClient.AsAIAgent(new()
     {
+        Id = key.ToLower(),
         Name = key,
         ChatOptions = new()
         {
@@ -75,9 +94,9 @@ builder.Services.AddAIAgent("Default", (services, key) =>
 }, ServiceLifetime.Scoped)
 .WithSessionStore((services, key) =>
 {
-    var agentSessionStore = services.GetRequiredService<InMemorySessionStore>();
+    var agentSessionStore = services.GetRequiredService<DatabaseSessionStore>();
     return agentSessionStore;
-}, withIsolation: false);
+}, ServiceLifetime.Scoped);
 
 builder.Services.AddAIAgent("Memory", (services, key) =>
 {
@@ -85,6 +104,7 @@ builder.Services.AddAIAgent("Memory", (services, key) =>
 
     return chatClient.AsAIAgent(new()
     {
+        Id = key.ToLower(),
         Name = key,
         ChatOptions = new()
         {
@@ -209,25 +229,6 @@ public static class DateTimeTools
         time calculations ('how long since', 'time elapsed'), or temporal filtering ('latest', 'newest', 'most recent'). You do NOT know the current date - you MUST call this tool to determine it.
         """)]
     public static DateTimeOffset GetCurrentDateTime() => DateTimeOffset.UtcNow;
-}
-
-public class InMemorySessionStore : AgentSessionStore
-{
-    private readonly ConcurrentDictionary<string, JsonElement> sessions = new();
-
-    public override async ValueTask<AgentSession> GetSessionAsync(AIAgent agent, string conversationId, CancellationToken cancellationToken = default)
-    {
-        JsonElement? sessionContent = sessions.TryGetValue(conversationId, out var session) ? session : null;
-
-        return sessionContent switch
-        {
-            null => await agent.CreateSessionAsync(cancellationToken),
-            _ => await agent.DeserializeSessionAsync(sessionContent.Value, cancellationToken: cancellationToken),
-        };
-    }
-
-    public override async ValueTask SaveSessionAsync(AIAgent agent, string conversationId, AgentSession session, CancellationToken cancellationToken = default)
-        => sessions[conversationId] = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
 }
 
 internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent memoryExtractorAgent, ApplicationDbContext dbContext, IHttpContextAccessor httpContextAccessor) : AIContextProvider
