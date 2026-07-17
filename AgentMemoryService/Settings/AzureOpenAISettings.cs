@@ -1,4 +1,4 @@
-﻿namespace AgentBasicService.Settings;
+﻿namespace AgentMemoryService.Settings;
 
 public class AzureOpenAISettings
 {

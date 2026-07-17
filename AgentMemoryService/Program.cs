@@ -1,22 +1,26 @@
 using System.ClientModel;
-using System.ComponentModel;
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
-using AgentBasicService.Settings;
+using AgentMemoryService.ContextProviders;
 using AgentMemoryService.Data;
-using AgentMemoryService.Data.Entities;
+using AgentMemoryService.Models;
 using AgentMemoryService.SessionStores;
+using AgentMemoryService.Settings;
+using AgentMemoryService.Tools;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Responses;
 using SimpleAuthentication;
 using TinyHelpers.AspNetCore.Extensions;
 using TinyHelpers.AspNetCore.OpenApi;
+using ChatResponse = AgentMemoryService.Models.ChatResponse;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
@@ -155,6 +159,7 @@ builder.Services.AddOpenApi(options =>
 });
 
 var app = builder.Build();
+await ConfigureDatabaseAsync(app.Services);
 
 // Configure the HTTP request pipeline.
 app.UseHttpsRedirection();
@@ -216,102 +221,39 @@ app.MapPost("/api/chat/streaming", async (ChatRequest request, [FromKeyedService
 
 app.Run();
 
-public record class ChatRequest(string? ConversationId, string Message);
-
-public record class ChatResponse(string? ConversationId, string? Response, long? TotalTokenCount = null);
-
-public static class DateTimeTools
+static async Task ConfigureDatabaseAsync(IServiceProvider serviceProvider)
 {
-    [Description("""
-        Returns the current date and time.
-        ALWAYS call this tool FIRST when the question involves ANY time reference, including: current date/time ('today', 'now', 'current year'),
-        relative periods ('recent', 'last/past X days/months/years', 'in the last decade'), time ranges that depend on today's date ('from 2020 to now', 'since January'),
-        time calculations ('how long since', 'time elapsed'), or temporal filtering ('latest', 'newest', 'most recent'). You do NOT know the current date - you MUST call this tool to determine it.
-        """)]
-    public static DateTimeOffset GetCurrentDateTime() => DateTimeOffset.UtcNow;
-}
+    await using var scope = serviceProvider.CreateAsyncScope();
 
-internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent memoryExtractorAgent, ApplicationDbContext dbContext, IHttpContextAccessor httpContextAccessor) : AIContextProvider
-{
-    protected override async ValueTask<AIContext> ProvideAIContextAsync(InvokingContext context, CancellationToken cancellationToken = new CancellationToken())
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    await EnsureDatabaseAsync();
+    await RunMigrationsAsync();
+
+    async Task EnsureDatabaseAsync()
     {
-        var aiContext = new AIContext();
-        var userName = httpContextAccessor.HttpContext?.User?.Identity?.Name;
+        var dbCreator = dbContext.GetService<IRelationalDatabaseCreator>();
+        var strategy = dbContext.Database.CreateExecutionStrategy();
 
-        var memory = await dbContext.Memories.FirstOrDefaultAsync(x => x.UserName == userName, cancellationToken);
-
-        if (memory?.Facts.Count is not > 0)
+        await strategy.ExecuteAsync(async () =>
         {
-            // There is nothing to provide, so we can return an empty context.
-            return aiContext;
-        }
-
-        var knownFacts = string.Join("\n", memory.Facts.Select(fact => $"- {fact}"));
-        var instructions = $"""
-            ## User Memories
-            {knownFacts}
-            """;
-
-        aiContext.Instructions = instructions;
-        return aiContext;
-    }
-
-    protected override async ValueTask StoreAIContextAsync(InvokedContext context, CancellationToken cancellationToken = new CancellationToken())
-    {
-        var userName = httpContextAccessor.HttpContext?.User?.Identity?.Name;
-        var memory = await dbContext.Memories.FirstOrDefaultAsync(x => x.UserName == userName, cancellationToken);
-
-        if (memory is null)
-        {
-            memory = new UserMemory { UserName = userName! };
-            dbContext.Memories.Add(memory);
-        }
-
-        var knownFacts = string.Join("\n", memory.Facts.Select(fact => $"- {fact}"));
-        var options = new ChatClientAgentRunOptions(new()
-        {
-            Instructions = $"""
-                ## Known facts about the user:
-                {knownFacts}
-
-                Use this list to avoid adding duplicates and to return exact known fact texts when a memory is invalidated.
-                """
+            // Create the database if it does not exist.
+            // Do this first so there is then a database to start a transaction against.
+            if (!await dbCreator.ExistsAsync())
+            {
+                await dbCreator.CreateAsync();
+            }
         });
+    }
 
-        var response = await memoryExtractorAgent.RunAsync<MemoryUpdate>(context.RequestMessages.Last(), options: options, cancellationToken: cancellationToken);
-        var memoryUpdate = response.Result;
+    async Task RunMigrationsAsync()
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy();
 
-        if (!memoryUpdate.FactsToAdd.Any() && !memoryUpdate.FactsToRemove.Any())
+        await strategy.ExecuteAsync(async () =>
         {
-            // There is nothing to update, so we can return early.
-            return;
-        }
-
-        foreach (var factToRemove in memoryUpdate.FactsToRemove)
-        {
-            var factToRemoveTrimmed = factToRemove.TrimEnd('.');
-            var existingMemory = memory.Facts.FirstOrDefault(fact => string.Equals(fact, factToRemoveTrimmed, StringComparison.OrdinalIgnoreCase));
-
-            if (existingMemory is not null)
-            {
-                memory.Facts.Remove(existingMemory);
-            }
-        }
-
-        foreach (var factToAdd in memoryUpdate.FactsToAdd)
-        {
-            var factToAddTrimmed = factToAdd.TrimEnd('.');
-
-            if (!memory.Facts.Contains(factToAddTrimmed, StringComparer.OrdinalIgnoreCase))
-            {
-                memory.Facts.Add(factToAddTrimmed);
-            }
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
+            // Run migration in a transaction to avoid partial migration if it fails.
+            await dbContext.Database.MigrateAsync();
+        });
     }
 }
-
-public record class MemoryUpdate(
-    [property: Description("New stable user facts to add. Do not include facts already present in the known facts list.")] IEnumerable<string> FactsToAdd,
-    [property: Description("Exact known fact texts to remove. Include a known fact only when it is clearly contradicted, replaced, negated, corrected, or invalidated by the latest user message.")] IEnumerable<string> FactsToRemove);
