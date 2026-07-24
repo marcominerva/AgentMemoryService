@@ -25,6 +25,13 @@ public class InMemorySessionStore : AgentSessionStore
         sessions[key] = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
     }
 
+    public override ValueTask DeleteSessionAsync(AIAgent agent, string conversationId, CancellationToken cancellationToken = default)
+    {
+        var key = GetKey(agent, conversationId);
+        sessions.TryRemove(key, out _);
+        return ValueTask.CompletedTask;
+    }
+
     private static string GetKey(AIAgent agent, string conversationId)
         => $"{agent.Id}:{conversationId}";
 }

@@ -219,6 +219,14 @@ app.MapPost("/api/chat/streaming", async (ChatRequest request, [FromKeyedService
 })
 .RequireAuthorization();
 
+app.MapDelete("/api/conversations/{id}", async (string id, [FromKeyedServices("Default")] AIAgent agent, [FromKeyedServices("Default")] AgentSessionStore store) =>
+{
+    await store.DeleteSessionAsync(agent, id);
+
+    return TypedResults.NoContent();
+})
+.RequireAuthorization();
+
 app.Run();
 
 static async Task ConfigureDatabaseAsync(IServiceProvider serviceProvider)

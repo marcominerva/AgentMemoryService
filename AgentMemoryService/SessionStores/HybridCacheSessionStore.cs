@@ -26,6 +26,12 @@ public class HybridCacheSessionStore(HybridCache cache) : AgentSessionStore
         await cache.SetAsync(key, sessionContent, cancellationToken: cancellationToken);
     }
 
+    public override async ValueTask DeleteSessionAsync(AIAgent agent, string conversationId, CancellationToken cancellationToken = default)
+    {
+        var key = GetKey(agent, conversationId);
+        await cache.RemoveAsync(key, cancellationToken);
+    }
+
     private static string GetKey(AIAgent agent, string conversationId)
         => $"{agent.Id}:{conversationId}";
 }

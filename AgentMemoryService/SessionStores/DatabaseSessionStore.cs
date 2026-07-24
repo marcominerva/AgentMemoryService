@@ -48,6 +48,14 @@ public class DatabaseSessionStore(ApplicationDbContext dbContext, IHttpContextAc
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public override async ValueTask DeleteSessionAsync(AIAgent agent, string conversationId, CancellationToken cancellationToken = default)
+    {
+        var key = GetKey(agent, conversationId);
+        var userName = httpContextAccessor.HttpContext?.User?.Identity?.Name;
+
+        await dbContext.Conversations.Where(c => c.UserName == userName && c.ConversationId == key).ExecuteDeleteAsync(cancellationToken);
+    }
+
     private static string GetKey(AIAgent agent, string conversationId)
         => $"{agent.Id}:{conversationId}";
 }
