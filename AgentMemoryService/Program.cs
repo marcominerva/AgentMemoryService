@@ -36,7 +36,12 @@ var openAISettings = builder.Services.ConfigureAndGet<AzureOpenAISettings>(build
 
 builder.Services.AddKeyedChatClient("Default", _ =>
 {
-    var openAIClient = new OpenAIClient(new ApiKeyCredential(openAISettings.ApiKey), new() { Endpoint = new(openAISettings.Endpoint) });
+    var openAIClient = new OpenAIClient(new ApiKeyCredential(openAISettings.ApiKey), new()
+    {
+        Endpoint = new(openAISettings.Endpoint),
+        //Transport = new HttpClientPipelineTransport(new HttpClient(new TraceHttpClientHandler()))
+    });
+
     return openAIClient.GetResponsesClient().AsIChatClientWithStoredOutputDisabled(openAISettings.DefaultDeployment);
 });
 
@@ -46,7 +51,7 @@ builder.Services.AddKeyedChatClient("Memory", _ =>
     return openAIClient.GetResponsesClient().AsIChatClientWithStoredOutputDisabled(openAISettings.MemoryDeployment);
 });
 
-builder.Services.UseClaimsBasedSessionIsolation(new()
+builder.Services.UseClaimsBasedAgentIsolation(new()
 {
     ClaimType = ClaimTypes.Name
 });
@@ -62,7 +67,6 @@ builder.Services.AddScoped<UserMemoryContextProvider>();
 //        LocalCacheExpiration = TimeSpan.FromHours(4)
 //    };
 //});
-
 //builder.Services.AddSingleton<HybridCacheSessionStore>();
 
 builder.Services.AddScoped<DatabaseSessionStore>();
