@@ -78,6 +78,7 @@ builder.Services.AddAIAgent("Default", (services, key) =>
     var chatHistoryProvider = new InMemoryChatHistoryProvider(new()
     {
         ChatReducer = new MessageCountingChatReducer(20), //new SummarizingChatReducer(chatClient, 1, 10)
+        ReducerTriggerEvent = InMemoryChatHistoryProviderOptions.ChatReducerTriggerEvent.AfterMessageAdded,
         StorageInputRequestMessageFilter = messages =>
         {
             return messages.Where(m => m.GetAgentRequestMessageSourceType() != AgentRequestMessageSourceType.ChatHistory
