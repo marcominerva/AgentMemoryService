@@ -2,6 +2,7 @@ using AgentMemoryService.Data;
 using AgentMemoryService.Data.Entities;
 using AgentMemoryService.Models;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgentMemoryService.ContextProviders;
@@ -33,6 +34,16 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
 
     protected override async ValueTask StoreAIContextAsync(InvokedContext context, CancellationToken cancellationToken = new CancellationToken())
     {
+        // Only actual user text is worth analyzing: runs that just carry tool approval responses (or other
+        // non-textual content) would produce an empty input for the extractor agent and make the request fail.
+        var lastUserMessage = context.RequestMessages
+            .LastOrDefault(message => message.Role == ChatRole.User && !string.IsNullOrWhiteSpace(message.Text));
+
+        if (lastUserMessage is null)
+        {
+            return;
+        }
+
         var userName = httpContextAccessor.HttpContext?.User?.Identity?.Name;
         var memory = await dbContext.Memories.FirstOrDefaultAsync(x => x.UserName == userName, cancellationToken);
 
@@ -53,7 +64,7 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
                 """
         });
 
-        var response = await memoryExtractorAgent.RunAsync<MemoryUpdate>(context.RequestMessages.Last(), options: options, cancellationToken: cancellationToken);
+        var response = await memoryExtractorAgent.RunAsync<MemoryUpdate>(lastUserMessage, options: options, cancellationToken: cancellationToken);
         var memoryUpdate = response.Result;
 
         if (!memoryUpdate.FactsToAdd.Any() && !memoryUpdate.FactsToRemove.Any())
