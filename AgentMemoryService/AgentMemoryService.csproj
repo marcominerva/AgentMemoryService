@@ -8,9 +8,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.21.0-preview.260911.1" />
-        <PackageReference Include="Microsoft.Agents.AI.Hosting.AspNetCore" Version="1.21.0-preview.260911.1" />
-        <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.21.0" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.22.0-preview.260918.1" />
+        <PackageReference Include="Microsoft.Agents.AI.Hosting.AspNetCore" Version="1.22.0-preview.260918.1" />
+        <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.22.0" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
           <PrivateAssets>all</PrivateAssets>

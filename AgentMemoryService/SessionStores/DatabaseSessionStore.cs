@@ -1,20 +1,19 @@
 ﻿using AgentMemoryService.Data;
 using AgentMemoryService.Data.Entities;
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgentMemoryService.SessionStores;
 
 public class DatabaseSessionStore(ApplicationDbContext dbContext, IHttpContextAccessor httpContextAccessor) : AgentSessionStore
 {
-    public override async ValueTask<AgentSession> GetSessionAsync(AIAgent agent, string conversationId, CancellationToken cancellationToken = default)
+    public override async ValueTask<AgentSession?> GetSessionAsync(AIAgent agent, AgentSessionStoreKey key, CancellationToken cancellationToken = default)
     {
-        var key = GetKey(agent, conversationId);
+        var conversationId = GetKey(agent, key);
         var userName = httpContextAccessor.HttpContext?.User?.Identity?.Name;
 
         var conversation = await dbContext.Conversations
-            .FirstOrDefaultAsync(c => c.UserName == userName && c.ConversationId == key, cancellationToken: cancellationToken);
+            .FirstOrDefaultAsync(c => c.UserName == userName && c.ConversationId == conversationId, cancellationToken: cancellationToken);
 
         return conversation switch
         {
@@ -23,20 +22,20 @@ public class DatabaseSessionStore(ApplicationDbContext dbContext, IHttpContextAc
         };
     }
 
-    public override async ValueTask SaveSessionAsync(AIAgent agent, string conversationId, AgentSession session, CancellationToken cancellationToken = default)
+    public override async ValueTask SaveSessionAsync(AIAgent agent, AgentSessionStoreKey key, AgentSession session, CancellationToken cancellationToken = default)
     {
-        var key = GetKey(agent, conversationId);
+        var conversationId = GetKey(agent, key);
         var userName = httpContextAccessor.HttpContext?.User?.Identity?.Name;
 
         var conversation = await dbContext.Conversations
-            .FirstOrDefaultAsync(c => c.UserName == userName && c.ConversationId == key, cancellationToken: cancellationToken);
+            .FirstOrDefaultAsync(c => c.UserName == userName && c.ConversationId == conversationId, cancellationToken: cancellationToken);
 
         if (conversation is null)
         {
             conversation = new UserConversation
             {
                 UserName = userName!,
-                ConversationId = key,
+                ConversationId = conversationId,
             };
 
             dbContext.Conversations.Add(conversation);
@@ -48,14 +47,13 @@ public class DatabaseSessionStore(ApplicationDbContext dbContext, IHttpContextAc
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public override async ValueTask DeleteSessionAsync(AIAgent agent, string conversationId, CancellationToken cancellationToken = default)
+    public string GetKey(AIAgent agent, AgentSessionStoreKey key)
     {
-        var key = GetKey(agent, conversationId);
-        var userName = httpContextAccessor.HttpContext?.User?.Identity?.Name;
+        if (key.Partitions?.TryGetValue("isolation", out var isolationKey) == true)
+        {
+            return $"{agent.Id}:{isolationKey}:{key.SessionId}";
+        }
 
-        await dbContext.Conversations.Where(c => c.UserName == userName && c.ConversationId == key).ExecuteDeleteAsync(cancellationToken);
+        return $"{agent.Id}:{key.SessionId}";
     }
-
-    private static string GetKey(AIAgent agent, string conversationId)
-        => $"{agent.Id}:{conversationId}";
 }

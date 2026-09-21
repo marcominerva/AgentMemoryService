@@ -1,16 +1,17 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting;
+
+namespace AgentMemoryService.SessionStores;
 
 public class InMemorySessionStore : AgentSessionStore
 {
     private readonly ConcurrentDictionary<string, JsonElement> sessions = new();
 
-    public override async ValueTask<AgentSession> GetSessionAsync(AIAgent agent, string conversationId, CancellationToken cancellationToken = default)
+    public override async ValueTask<AgentSession?> GetSessionAsync(AIAgent agent, AgentSessionStoreKey key, CancellationToken cancellationToken = default)
     {
-        var key = GetKey(agent, conversationId);
-        JsonElement? sessionContent = sessions.TryGetValue(key, out var session) ? session : null;
+        var conversationId = GetKey(agent, key);
+        JsonElement? sessionContent = sessions.TryGetValue(conversationId, out var session) ? session : null;
 
         return sessionContent switch
         {
@@ -19,19 +20,19 @@ public class InMemorySessionStore : AgentSessionStore
         };
     }
 
-    public override async ValueTask SaveSessionAsync(AIAgent agent, string conversationId, AgentSession session, CancellationToken cancellationToken = default)
+    public override async ValueTask SaveSessionAsync(AIAgent agent, AgentSessionStoreKey key, AgentSession session, CancellationToken cancellationToken = default)
     {
-        var key = GetKey(agent, conversationId);
-        sessions[key] = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
+        var conversationId = GetKey(agent, key);
+        sessions[conversationId] = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
     }
 
-    public override ValueTask DeleteSessionAsync(AIAgent agent, string conversationId, CancellationToken cancellationToken = default)
+    public string GetKey(AIAgent agent, AgentSessionStoreKey key)
     {
-        var key = GetKey(agent, conversationId);
-        sessions.TryRemove(key, out _);
-        return ValueTask.CompletedTask;
-    }
+        if (key.Partitions?.TryGetValue("isolation", out var isolationKey) == true)
+        {
+            return $"{agent.Id}:{isolationKey}:{key.SessionId}";
+        }
 
-    private static string GetKey(AIAgent agent, string conversationId)
-        => $"{agent.Id}:{conversationId}";
+        return $"{agent.Id}:{key.SessionId}";
+    }
 }
