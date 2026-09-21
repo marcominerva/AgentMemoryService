@@ -11,13 +11,10 @@ public class InMemorySessionStore : AgentSessionStore
     public override async ValueTask<AgentSession?> GetSessionAsync(AIAgent agent, AgentSessionStoreKey key, CancellationToken cancellationToken = default)
     {
         var conversationId = GetKey(agent, key);
-        JsonElement? sessionContent = sessions.TryGetValue(conversationId, out var session) ? session : null;
+        var sessionContent = sessions.TryGetValue(conversationId, out var session)
+            ? await agent.DeserializeSessionAsync(session, cancellationToken: cancellationToken) : null;
 
-        return sessionContent switch
-        {
-            null => await agent.CreateSessionAsync(cancellationToken),
-            _ => await agent.DeserializeSessionAsync(sessionContent.Value, cancellationToken: cancellationToken),
-        };
+        return sessionContent;
     }
 
     public override async ValueTask SaveSessionAsync(AIAgent agent, AgentSessionStoreKey key, AgentSession session, CancellationToken cancellationToken = default)

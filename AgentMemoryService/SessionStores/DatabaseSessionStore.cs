@@ -15,11 +15,8 @@ public class DatabaseSessionStore(ApplicationDbContext dbContext, IHttpContextAc
         var conversation = await dbContext.Conversations
             .FirstOrDefaultAsync(c => c.UserName == userName && c.ConversationId == conversationId, cancellationToken: cancellationToken);
 
-        return conversation switch
-        {
-            null => await agent.CreateSessionAsync(cancellationToken),
-            _ => await agent.DeserializeSessionAsync(conversation.Session, cancellationToken: cancellationToken),
-        };
+        var session = conversation?.Session is not null ? await agent.DeserializeSessionAsync(conversation.Session, cancellationToken: cancellationToken) : null;
+        return session;
     }
 
     public override async ValueTask SaveSessionAsync(AIAgent agent, AgentSessionStoreKey key, AgentSession session, CancellationToken cancellationToken = default)

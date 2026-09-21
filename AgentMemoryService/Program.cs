@@ -184,11 +184,11 @@ app.UseAuthorization();
 app.MapPost("/api/chat", async (ChatRequest request, [FromKeyedServices("Default")] AIAgent agent, [FromKeyedServices("Default")] AgentSessionStore store) =>
 {
     var conversationId = request.ConversationId ?? Guid.NewGuid().ToString("N");
-    var session = await store.GetSessionAsync(agent, new(conversationId));
+    var session = await store.GetOrCreateSessionAsync(agent, new(conversationId));
 
     var response = await agent.RunAsync(request.Message, session);
 
-    await store.SaveSessionAsync(agent, new(conversationId), session!);
+    await store.SaveSessionAsync(agent, new(conversationId), session);
 
     return TypedResults.Ok(new ChatResponse(conversationId, response.Text, response.Usage?.TotalTokenCount));
 })
@@ -199,7 +199,7 @@ app.MapPost("/api/chat/streaming", async (ChatRequest request, [FromKeyedService
     async IAsyncEnumerable<SseItem<ChatResponse>> StreamAsync([EnumeratorCancellation] CancellationToken innerCancellationToken)
     {
         var conversationId = request.ConversationId ?? Guid.NewGuid().ToString("N");
-        var session = await store.GetSessionAsync(agent, new(conversationId), innerCancellationToken);
+        var session = await store.GetOrCreateSessionAsync(agent, new(conversationId), innerCancellationToken);
 
         var updates = new List<AgentResponseUpdate>();
 
@@ -214,7 +214,7 @@ app.MapPost("/api/chat/streaming", async (ChatRequest request, [FromKeyedService
             }
         }
 
-        await store.SaveSessionAsync(agent, new(conversationId), session!, innerCancellationToken);
+        await store.SaveSessionAsync(agent, new(conversationId), session, innerCancellationToken);
         var response = updates.ToAgentResponse();
 
         yield return new SseItem<ChatResponse>(new ChatResponse(null, null, response.Usage?.TotalTokenCount), "metadata");
