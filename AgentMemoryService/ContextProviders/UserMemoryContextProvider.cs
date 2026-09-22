@@ -2,8 +2,8 @@ using AgentMemoryService.Data;
 using AgentMemoryService.Data.Entities;
 using AgentMemoryService.Models;
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 
 namespace AgentMemoryService.ContextProviders;
 

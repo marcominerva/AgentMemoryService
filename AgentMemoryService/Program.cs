@@ -88,7 +88,7 @@ builder.Services.AddAIAgent("Default", (services, key) =>
 
     return chatClient.AsAIAgent(new()
     {
-        Id = key.ToLower(),
+        Id = key.ToLowerInvariant(),
         Name = key,
         ChatOptions = new()
         {
@@ -113,15 +113,22 @@ builder.Services.AddAIAgent("Memory", (services, key) =>
 
     return chatClient.AsAIAgent(new()
     {
-        Id = key.ToLower(),
+        Id = key.ToLowerInvariant(),
         Name = key,
         ChatOptions = new()
         {
             Instructions = """
+                You are a memory management agent responsible for maintaining accurate, concise, and useful facts about the user.
+
                 Look at the user message and update the user's memories.
 
                 The known facts about the user are provided in the system instructions.
+                Use that list to avoid adding duplicates and to identify memories invalidated by newer information.
                 Extract only stable user facts from the user message, such as names, places, likes, dislikes, current state, preferences, relationships, roles, or anything the user asks to remember.
+
+                Write each memory as a self-contained, precise, and concise statement.
+                Include only the information needed to preserve the fact accurately.
+                Do not add explanations, assumptions, conversational context, or redundant details.
 
                 Add a new memory only when the user message contains a stable fact that is not already present.
 
