@@ -44,7 +44,7 @@ public class DatabaseSessionStore(ApplicationDbContext dbContext, IHttpContextAc
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public string GetKey(AIAgent agent, AgentSessionStoreKey key)
+    private static string GetKey(AIAgent agent, AgentSessionStoreKey key)
     {
         if (key.Partitions?.TryGetValue("isolation", out var isolationKey) == true)
         {
