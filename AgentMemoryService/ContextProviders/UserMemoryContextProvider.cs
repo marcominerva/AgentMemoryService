@@ -9,7 +9,7 @@ namespace AgentMemoryService.ContextProviders;
 
 internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent memoryExtractorAgent, ApplicationDbContext dbContext, IHttpContextAccessor httpContextAccessor) : AIContextProvider
 {
-    protected override async ValueTask<AIContext> ProvideAIContextAsync(InvokingContext context, CancellationToken cancellationToken = new CancellationToken())
+    protected override async ValueTask<AIContext> ProvideAIContextAsync(InvokingContext context, CancellationToken cancellationToken = default)
     {
         var aiContext = new AIContext();
         var userName = httpContextAccessor.HttpContext?.User?.Identity?.Name;
@@ -32,7 +32,7 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
         return aiContext;
     }
 
-    protected override async ValueTask StoreAIContextAsync(InvokedContext context, CancellationToken cancellationToken = new CancellationToken())
+    protected override async ValueTask StoreAIContextAsync(InvokedContext context, CancellationToken cancellationToken = default)
     {
         // Only actual user text is worth analyzing: runs that just carry tool approval responses (or other
         // non-textual content) would produce an empty input for the extractor agent and make the request fail.
