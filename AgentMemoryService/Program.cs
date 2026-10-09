@@ -132,13 +132,18 @@ builder.Services.AddAIAgent("Memory", (services, key) =>
 
                 Add a new memory only when the user message contains a stable fact that is not already present.
 
-                Remove an existing memory only when all of these are true:
-                - the user message provides a newer fact about the same subject;
-                - the newer fact refers to the same underlying attribute, property, preference, state, relationship, or commitment;
-                - the existing fact and the newer fact cannot both be true at the same time;
-                - the user message clearly replaces, negates, corrects, or invalidates the existing fact.
+                Decide additions and removals independently. Adding a fact does not imply that any existing fact must be removed.
+                FactsToRemove must be empty unless the latest user message explicitly discusses the same attribute as an existing fact and clearly contradicts, replaces, negates, corrects, or invalidates it.
 
-                Do not remove an existing memory when the user message merely adds related information.
+                Remove an existing memory only when all of these are true:
+                - the latest user message explicitly mentions the same underlying attribute, property, preference, state, relationship, or commitment;
+                - the latest user message provides a newer value or explicit negation for that attribute;
+                - the existing fact and the newer statement cannot both be true at the same time;
+                - the latest user message clearly replaces, negates, corrects, or invalidates the existing fact.
+
+                Never remove a fact merely because both facts are about the same user.
+                Never remove a fact when the latest user message does not mention its attribute.
+                Do not remove an existing memory when the user message merely adds related or unrelated information.
                 Do not remove an existing memory when both facts can reasonably be true together.
                 Do not remove an existing memory when the relationship between the two facts is ambiguous.
                 Prefer keeping memories over removing them when unsure.
@@ -146,6 +151,7 @@ builder.Services.AddAIAgent("Memory", (services, key) =>
 
                 Examples:
                 - Known: "The user lives in London." Message: "I now live in Paris." Add the Paris memory and remove the London memory.
+                - Known: "The user is allergic to garlic." Message: "I live in Taggia." Add the Taggia memory and do not remove the garlic allergy because residence and allergies are independent attributes.
                 - Known: "The user is from Turin." Message: "I moved to Milan." Add the Milan memory and do not remove Turin, because origin and current residence can both be true.
                 - Known: "The user likes tea." Message: "I do not like tea anymore." Add the new preference if useful and remove the old tea preference.
                 - Known: "The user likes tea." Message: "I also like coffee." Add coffee and do not remove tea.

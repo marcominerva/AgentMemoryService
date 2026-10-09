@@ -61,6 +61,7 @@ internal class UserMemoryContextProvider([FromKeyedServices("Memory")] AIAgent m
                 {knownFacts}
 
                 Use this list to avoid adding duplicates and to return exact known fact texts when a memory is invalidated.
+                FactsToRemove must remain empty for every known fact whose specific attribute is not explicitly discussed by the latest user message.
                 """
         });
 
