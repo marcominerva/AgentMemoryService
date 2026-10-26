@@ -25,6 +25,12 @@ public class HybridCacheSessionStore(HybridCache cache) : AgentSessionStore
         await cache.SetAsync(conversationId, sessionContent, cancellationToken: cancellationToken);
     }
 
+    public override ValueTask DeleteSessionAsync(AIAgent agent, AgentSessionStoreKey key, CancellationToken cancellationToken = default)
+    {
+        var conversationId = GetKey(agent, key);
+        return cache.RemoveAsync(conversationId, cancellationToken: cancellationToken);
+    }
+
     public string GetKey(AIAgent agent, AgentSessionStoreKey key)
     {
         if (key.Partitions?.TryGetValue("isolation", out var isolationKey) == true)

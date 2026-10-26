@@ -44,6 +44,15 @@ public class DatabaseSessionStore(ApplicationDbContext dbContext, IHttpContextAc
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public override async ValueTask DeleteSessionAsync(AIAgent agent, AgentSessionStoreKey key, CancellationToken cancellationToken = default)
+    {
+        var conversationId = GetKey(agent, key);
+        var userName = httpContextAccessor.HttpContext?.User?.Identity?.Name;
+
+        await dbContext.Conversations.Where(c => c.UserName == userName && c.ConversationId == conversationId)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
     private static string GetKey(AIAgent agent, AgentSessionStoreKey key)
     {
         if (key.Partitions?.TryGetValue("isolation", out var isolationKey) == true)
