@@ -12,8 +12,6 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Responses;
@@ -244,32 +242,5 @@ static async Task ConfigureDatabaseAsync(IServiceProvider serviceProvider)
     await using var scope = serviceProvider.CreateAsyncScope();
 
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-    await EnsureDatabaseAsync();
-    await RunMigrationsAsync();
-
-    async Task EnsureDatabaseAsync()
-    {
-        var dbCreator = dbContext.GetService<IRelationalDatabaseCreator>();
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-
-        await strategy.ExecuteAsync(async () =>
-        {
-            // Create the database if it does not exist.
-            if (!await dbCreator.ExistsAsync())
-            {
-                await dbCreator.CreateAsync();
-            }
-        });
-    }
-
-    async Task RunMigrationsAsync()
-    {
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-
-        await strategy.ExecuteAsync(async () =>
-        {
-            await dbContext.Database.MigrateAsync();
-        });
-    }
+    await dbContext.Database.MigrateAsync();
 }
